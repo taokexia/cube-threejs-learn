@@ -2,6 +2,7 @@ import * as THREE from 'threejs/three.js'
 require('threejs/OrbitControls.js');
 import BasicRubik from 'object/Rubik.js'
 import TouchLine from 'object/TouchLine'
+import TWEEN from 'tween/tween.js';
 
 const Context = canvas.getContext('webgl');
 
@@ -104,7 +105,9 @@ export default class Main {
 
     // 滑动控制条
     this.touchLine = new TouchLine(this);
-
+    this.rubikResize((1 - this.minPercent), this.minPercent);//默认正视图占85%区域，反视图占15%区域
+    // 执行动画
+    this.enterAnimation();
   }
 
   /**
@@ -376,5 +379,59 @@ export default class Main {
     this.normalize = null;
     this.startPoint = null;
     this.movePoint = null;
+  }
+
+  /**
+   * 进场动画
+   */
+  enterAnimation() {
+    var self = this;
+    // 首先定义一个变量用来标识动画结束；
+    var isAnimationEnd = false;
+
+    // 定义动画开始前的状态和动画结束后的状态；
+    var endStatus = {//目标状态
+      rotateY: this.frontRubik.group.rotation.y,
+      y: this.frontRubik.group.position.y,
+      z: this.frontRubik.group.position.z
+    }
+
+    this.frontRubik.group.rotateY(-90 / 180 * Math.PI);//把魔方设置为动画开始状态
+    this.frontRubik.group.position.y += this.originHeight / 3;
+    this.frontRubik.group.position.z -= 350;
+
+    var startStatus = {//开始状态
+      rotateY: this.frontRubik.group.rotation.y,
+      y: this.frontRubik.group.position.y,
+      z: this.frontRubik.group.position.z
+    }
+
+    var tween = new TWEEN.Tween(startStatus)
+      .to(endStatus, 2000)
+      .easing(TWEEN.Easing.Quadratic.In)
+      .onUpdate(function () {
+        self.frontRubik.group.rotation.y = startStatus.rotateY;
+        self.frontRubik.group.position.y = startStatus.y
+        self.frontRubik.group.position.z = startStatus.z
+      }).onComplete(function () {
+        isAnimationEnd = true;
+      });
+
+    function animate(time) {
+      if (!isAnimationEnd) {
+        requestAnimationFrame(animate);
+        TWEEN.update();
+      }
+    }
+
+    setTimeout(function () {
+      tween.start();
+      requestAnimationFrame(animate);
+    }, 500)
+
+    var stepArr = this.frontRubik.randomRotate();
+    this.endRubik.runMethodAtNo(stepArr, 0, function () {
+      self.initEvent();//进场动画结束之后才能进行手动操作
+    });
   }
 }

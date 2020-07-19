@@ -524,4 +524,81 @@ export default class Rubik {
       });
     }
   }
+
+   /**
+   * 以正视角魔方为基准
+   * 魔方基本公式 U、R、F、D、L、B、u、r、f、d、l、b
+   */
+  U(next) {
+    this.rotateMove(this.minCubeIndex, 1.3, next, 100);
+  }
+  R(next) {
+    this.rotateMove(this.minCubeIndex, 2.4, next, 100);
+  }
+  F(next) {
+    this.rotateMove(this.minCubeIndex, 4.1, next, 100);
+  }
+  D(next) {
+    this.rotateMove(this.minCubeIndex + 6, 4.4, next, 100);
+  }
+  L(next) {
+    this.rotateMove(this.minCubeIndex + 18, 1.1, next, 100);
+  }
+  B(next) {
+    this.rotateMove(this.minCubeIndex + 2, 2.1, next, 100);
+  }
+  u(next) {
+    this.rotateMove(this.minCubeIndex, 4.4, next, 100);
+  }
+  r(next) {
+    this.rotateMove(this.minCubeIndex, 1.1, next, 100);
+  }
+  f(next) {
+    this.rotateMove(this.minCubeIndex, 2.1, next, 100);
+  }
+  d(next) {
+    this.rotateMove(this.minCubeIndex + 6, 1.3, next, 100);
+  }
+  l(next) {
+    this.rotateMove(this.minCubeIndex + 18, 2.4, next, 100);
+  }
+  b(next) {
+    this.rotateMove(this.minCubeIndex + 2, 4.1, next, 100);
+  }
+
+  /**
+   * 按顺序执行数组里边的方法
+   */
+  runMethodAtNo(arr, no, next) {
+    var self = this;
+    if (no >= arr.length - 1) {
+      if (next) {
+        this[arr[no]](next);
+      } else {
+        this[arr[no]]();
+      }
+    } else {
+      this[arr[no]](function () {
+        if (no < arr.length - 1) {
+          no++
+          self.runMethodAtNo(arr, no, next);
+        }
+      })
+    }
+  }
+
+  /**
+   * 随机旋转，用于打乱魔方
+   */
+  randomRotate(callback) {
+    var stepNum = 21;
+    var stepArr = [];
+    var funcArr = ['R', 'U', 'F', 'B', 'L', 'D', 'r', 'u', 'f', 'b', 'l', 'd'];
+    for (var i = 0; i < stepNum; i++) {
+      var num = parseInt(Math.random() * funcArr.length);
+      stepArr.push(funcArr[num]);
+    }
+    this.runMethodAtNo(stepArr, 0, callback);
+    return stepArr;
+  }
 }

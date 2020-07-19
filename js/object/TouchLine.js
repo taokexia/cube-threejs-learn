@@ -31,6 +31,7 @@ export default class TouchLine {
       self.plane = new THREE.Mesh(geometry, material);
       self.plane.position.set(0, 0, 0);
       self.main.scene.add(self.plane);
+      self.defaultPosition();
     }, function (xhr) {
       console.log((xhr.loaded / xhr.total * 100) + '% loaded');
     }, function (xhr) {
