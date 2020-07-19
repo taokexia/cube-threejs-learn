@@ -505,4 +505,23 @@ export default class Rubik {
       }, totalTime);
     });
   }
+
+  /**
+   * 转动魔方整体
+   */
+  rotateMoveWhole(cubeIndex, direction, callback, totalTime) {
+    if (cubeIndex != null && direction != null) {
+      var self = this;
+      totalTime = totalTime ? totalTime : this.defaultTotalTime;
+      var elements = this.cubes;
+      requestAnimationFrame(function (timestamp) {
+        self.rotateAnimation(elements, direction, timestamp, 0, 0, function () {
+          self.updateCubeIndex(elements);
+          if (callback) {
+            callback();
+          }
+        }, totalTime);
+      });
+    }
+  }
 }

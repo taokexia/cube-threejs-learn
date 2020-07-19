@@ -129,6 +129,9 @@ export default class Main {
       if (!this.isRotating && this.intersect) {//触摸点在魔方上且魔方没有转动
         this.startPoint = this.intersect.point;//开始转动，设置起始点
       }
+      if (!this.isRotating && !this.intersect) {//触摸点没在魔方上
+        this.startPoint = new THREE.Vector2(touch.clientX, touch.clientY);
+      }
     }
   }
 
@@ -148,6 +151,12 @@ export default class Main {
         this.movePoint = this.intersect.point;
         if (!this.movePoint.equals(this.startPoint)){//触摸点和滑动点不一样则意味着可以得到转动向量
           this.rotateRubik();
+        }
+      }
+      if (!this.isRotating && this.startPoint && !this.intersect) {//触摸点没在魔方上
+        this.movePoint = new THREE.Vector2(touch.clientX, touch.clientY);
+        if (!this.movePoint.equals(this.startPoint)) {
+          this.rotateView();
         }
       }
     }
@@ -175,6 +184,89 @@ export default class Main {
   rubikResize(frontPercent, endPercent) {
     this.frontRubik.resizeHeight(frontPercent, 1);
     this.endRubik.resizeHeight(endPercent, -1);
+  }
+
+  /**
+   * 获得视图转动方块索引
+   */
+  getViewRotateCubeIndex(type) {
+    if (type == this.frontViewName) {
+      return 10;
+    } else {
+      return 65;
+    }
+  }
+
+  /**
+   * 获得视图转动方向
+   */
+  getViewDirection(type, startPoint, movePoint) {
+    var direction;
+    var rad = 30 * Math.PI / 180;
+    var lenX = movePoint.x - startPoint.x;
+    var lenY = movePoint.y - startPoint.y;
+    if (type == this.frontViewName) {
+      if (startPoint.x > window.innerWidth / 2) {
+        if (Math.abs(lenY) > Math.abs(lenX) * Math.tan(rad)) {
+          if (lenY < 0) {
+            direction = 2.1;
+          } else {
+            direction = 3.1;
+          }
+        } else {
+          if (lenX > 0) {
+            direction = 0.3;
+          } else {
+            direction = 1.3;
+          }
+        }
+      } else {
+        if (Math.abs(lenY) > Math.abs(lenX) * Math.tan(rad)) {
+          if (lenY < 0) {
+            direction = 2.4;
+          } else {
+            direction = 3.4;
+          }
+        } else {
+          if (lenX > 0) {
+            direction = 4.4;
+          } else {
+            direction = 5.4;
+          }
+        }
+      }
+    } else {
+      if (startPoint.x > window.innerWidth / 2) {
+        if (Math.abs(lenY) > Math.abs(lenX) * Math.tan(rad)) {
+          if (lenY < 0) {
+            direction = 2.2;
+          } else {
+            direction = 3.2;
+          }
+        } else {
+          if (lenX > 0) {
+            direction = 1.4;
+          } else {
+            direction = 0.4;
+          }
+        }
+      } else {
+        if (Math.abs(lenY) > Math.abs(lenX) * Math.tan(rad)) {
+          if (lenY < 0) {
+            direction = 2.3;
+          } else {
+            direction = 3.3;
+          }
+        } else {
+          if (lenX > 0) {
+            direction = 5.3;
+          } else {
+            direction = 4.3;
+          }
+        }
+      }
+    }
+    return direction;
   }
 
   /**
@@ -246,6 +338,31 @@ export default class Main {
     this.anotherRubik.rotateMove(anotherIndex, direction, function () {
       self.resetRotateParams();
     });
+  }
+
+  /**
+   * 转动视图
+   */
+  rotateView() {
+    var self = this;
+    if (this.startPoint.y < this.touchLine.screenRect.top) {
+      this.targetRubik = this.frontRubik;
+      this.anotherRubik = this.endRubik;
+    } else if (this.startPoint.y > this.touchLine.screenRect.top + this.touchLine.screenRect.height) {
+      this.targetRubik = this.endRubik;
+      this.anotherRubik = this.frontRubik;
+    }
+    if (this.targetRubik && this.anotherRubik) {
+      this.isRotating = true;//转动标识置为true
+      //计算整体转动方向
+      var targetType = this.targetRubik.group.childType;
+      var cubeIndex = this.getViewRotateCubeIndex(targetType);
+      var direction = this.getViewDirection(targetType, this.startPoint, this.movePoint);
+      this.targetRubik.rotateMoveWhole(cubeIndex, direction);
+      this.anotherRubik.rotateMoveWhole(cubeIndex, direction, function () {
+        self.resetRotateParams();
+      });
+    }
   }
 
   /**
