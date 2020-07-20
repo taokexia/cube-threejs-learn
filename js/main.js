@@ -4,7 +4,50 @@ import BasicRubik from 'object/Rubik.js'
 import TouchLine from 'object/TouchLine'
 import TWEEN from 'tween/tween.js';
 
+import ResetBtn from 'object/ResetBtn.js'
+import RestoreBtn from 'object/RestoreBtn'
+import DisorganizeBtn from './object/DisorganizeBtn'
+import SaveBtn from 'object/SaveBtn'
+
 const Context = canvas.getContext('webgl');
+
+/**
+ * 圆角矩形
+ */
+function radiusRect(context, options) {
+  var min = options.width > options.height ? options.height : options.width;
+  if (options.radius * 2 > min) {
+    options.radius = min / 2;
+  }
+  context.moveTo(options.x + options.radius, options.y);
+  context.lineTo(options.x + options.width - options.radius, options.y);
+  context.quadraticCurveTo(options.x + options.width, options.y, options.x + options.width, options.y + options.radius);//quadraticCurveTo二次贝塞尔曲线
+  context.lineTo(options.x + options.width, options.y + options.height - options.radius);
+  context.quadraticCurveTo(options.x + options.width, options.y + options.height, options.x + options.width - options.radius, options.y + options.height);
+  context.lineTo(options.x + options.radius, options.y + options.height);
+  context.quadraticCurveTo(options.x, options.y + options.height, options.x, options.y + options.height - options.radius);
+  context.lineTo(options.x, options.y + options.radius);
+  context.quadraticCurveTo(options.x, options.y, options.x + options.radius, options.y);
+  context.strokeStyle = options.backgroundColor;
+  context.stroke();
+  context.fillStyle = options.backgroundColor;
+  context.fill();
+}
+
+/**
+ * 生成半透明背景素材
+ */
+function background() {
+  var color = 'rgba(0,0,0,0.1)';
+  var canvas = document.createElement('canvas');
+  canvas.width = 80;
+  canvas.height = 64;
+  var context = canvas.getContext('2d');
+  context.beginPath();
+  radiusRect(context, { radius: 8, width: 80, height: 64, x: 0, y: 0, backgroundColor: color });
+  context.closePath();
+  return canvas;
+}
 
 /**
  * 游戏主函数
@@ -72,6 +115,9 @@ export default class Main {
     //透视投影相机视角为垂直视角，根据视角可以求出原点所在裁切面的高度，然后已知高度和宽高比可以计算出宽度
     this.originHeight = Math.tan(22.5 / 180 * Math.PI) * this.camera.position.z * 2;
     this.originWidth = this.originHeight * this.camera.aspect;
+
+    //UI元素逻辑尺寸和屏幕尺寸比率
+    this.uiRadio = this.originWidth / window.innerWidth;
   }
 
   /**
@@ -108,6 +154,12 @@ export default class Main {
     this.rubikResize((1 - this.minPercent), this.minPercent);//默认正视图占85%区域，反视图占15%区域
     // 执行动画
     this.enterAnimation();
+
+    //重置按钮
+    this.resetBtn = new ResetBtn(this);
+    this.restoreBtn = new RestoreBtn(this);
+    this.disorganizeBtn = new DisorganizeBtn(this);
+    this.saveBtn = new SaveBtn(this);
   }
 
   /**
@@ -127,6 +179,18 @@ export default class Main {
     this.startPoint = touch;
     if (this.touchLine.isHover(touch)) {
       this.touchLine.enable();
+    } else if (this.resetBtn.isHover(touch) && !this.isRotating){
+      this.resetBtn.enable();
+      this.resetRubik();
+    } else if (this.disorganizeBtn.isHover(touch) && !this.isRotating){
+      this.disorganizeBtn.enable();
+      this.disorganizeRubik();
+    } else if (this.saveBtn.isHover(touch) && !this.isRotating){
+      this.saveBtn.enable();
+      this.saveRubik();
+    } else if (this.restoreBtn.isHover(touch) && !this.isRotating){
+      this.restoreBtn.enable();
+      this.restoreRubik();
     } else {
       this.getIntersects(event);
       if (!this.isRotating && this.intersect) {//触摸点在魔方上且魔方没有转动
@@ -148,7 +212,7 @@ export default class Main {
       var frontPercent = touch.clientY / window.innerHeight;
       var endPercent = 1 - frontPercent;
       this.rubikResize(frontPercent, endPercent);
-    } else {
+    } else if(!this.resetBtn.isActive && !this.disorganizeBtn.isActive && !this.saveBtn.isActive && !this.restoreBtn.isActive)  {
       this.getIntersects(event);
       if (!this.isRotating && this.startPoint && this.intersect) { //滑动点在魔方上且魔方没有转动
         this.movePoint = this.intersect.point;
@@ -170,6 +234,10 @@ export default class Main {
    */
   touchEnd(){
     this.touchLine.disable();
+    this.resetBtn.disable();
+    this.disorganizeBtn.disable();
+    this.saveBtn.disable();
+    this.restoreBtn.disable();
   }
 
   /**
@@ -433,5 +501,88 @@ export default class Main {
     this.endRubik.runMethodAtNo(stepArr, 0, function () {
       self.initEvent();//进场动画结束之后才能进行手动操作
     });
+  }
+
+  /**
+   * 重置正反视图魔方
+   */
+  resetRubik(){
+    this.frontRubik.reset();
+    this.endRubik.reset();
+  }
+
+  /**
+   * 扰乱正反视图魔方
+   */
+  disorganizeRubik(callback){
+    var self = this;
+    if(!this.isRotating){
+      this.isRotating = true;
+      var stepArr = this.frontRubik.randomRotate();
+      this.endRubik.runMethodAtNo(stepArr, 0, function(){
+        if (callback){
+          callback();
+        }
+        self.resetRotateParams();
+      });
+    }
+  }
+
+  /**
+   * 存储魔方
+   */
+  saveRubik(){
+    wx.showLoading({
+      title: '存档中...',
+      mask:true
+    })
+    
+    var bgCanvas = background();
+    var radio = this.originWidth / 750;
+
+    if (!this.tagRubik){
+      this.tagRubik = new BasicRubik(this);
+      this.tagRubik.model();
+    }
+    var tagPosition = this.saveBtn.getPosition();
+    tagPosition.y -= this.saveBtn.height/2+15;
+    tagPosition.x += (this.saveBtn.width - bgCanvas.width) / 2 * radio;
+    this.tagRubik.save(this.frontRubik, tagPosition, 0.05);
+    this.scene.add(this.tagRubik.group);
+
+    //添加灰色半透明背景
+    if (!this.tagRubikBg){
+      var bgWidth = bgCanvas.width * radio;
+      var bgHeight = bgCanvas.height * radio;
+      var geometry = new THREE.PlaneGeometry(bgWidth, bgHeight);
+      var texture = new THREE.CanvasTexture(bgCanvas);
+      var material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+      this.tagRubikBg = new THREE.Mesh(geometry, material);
+    }
+    this.tagRubikBg.position.x = tagPosition.x;
+    this.tagRubikBg.position.y = tagPosition.y;
+    this.tagRubikBg.position.z = tagPosition.z;
+    this.scene.add(this.tagRubikBg);
+
+    setTimeout(function(){
+      wx.hideLoading()
+    },500)
+  }
+
+  /**
+   * 读取魔方
+   */
+  restoreRubik(){
+    if (this.tagRubik){
+      this.frontRubik.save(this.tagRubik);
+      this.endRubik.save(this.tagRubik);
+
+      if (this.tagRubik) {
+        this.scene.remove(this.tagRubik.group);
+      }
+      if (this.tagRubikBg) {
+        this.scene.remove(this.tagRubikBg);
+      }
+    }
   }
 }
